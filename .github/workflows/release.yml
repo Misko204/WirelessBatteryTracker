@@ -1,0 +1,43 @@
+# Builds the installer on GitHub's Windows machines.
+#  - Push a tag like v1.2.0  -> builds and publishes a GitHub Release with the installer attached.
+#  - "Run workflow" button   -> builds and keeps the installer as a downloadable workflow artifact.
+name: Build installer
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $version = if ("${{ github.ref_type }}" -eq "tag") { "${{ github.ref_name }}".TrimStart("v") } else { "" }
+          if ($version) { ./build.ps1 -Version $version } else { ./build.ps1 }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer
+          path: dist/*.exe
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.exe
+          generate_release_notes: true

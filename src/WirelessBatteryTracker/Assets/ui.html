@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wireless device battery tracker</title>
+<style>
+  :root {
+    --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    --font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+    --icons: "Segoe Fluent Icons", "Segoe MDL2 Assets";
+    --accent: #005fb8;
+    --on-accent: #ffffff;
+    --text: #1a1a1a;
+    --text-2: #5d5d5d;
+    --text-3: #8a8a8a;
+    --card: rgba(255,255,255,.72);
+    --card-hover: rgba(249,249,249,.85);
+    --card-border: rgba(0,0,0,.06);
+    --divider: rgba(0,0,0,.07);
+    --control: rgba(255,255,255,.7);
+    --control-hover: rgba(249,249,249,.5);
+    --control-border: rgba(0,0,0,.08);
+    --control-border-bottom: rgba(0,0,0,.16);
+    --track: rgba(0,0,0,.08);
+    --good: #0f7b0f;
+    --warn: #9d5d00;
+    --bad: #c42b1c;
+    --charge: #0f7b0f;
+    --flyout-bg: #f3f3f3;
+  }
+  .dark {
+    --accent: #60cdff;
+    --on-accent: #000000;
+    --text: #ffffff;
+    --text-2: #c5c5c5;
+    --text-3: #8b8b8b;
+    --card: rgba(255,255,255,.05);
+    --card-hover: rgba(255,255,255,.08);
+    --card-border: rgba(0,0,0,.1);
+    --divider: rgba(255,255,255,.08);
+    --control: rgba(255,255,255,.06);
+    --control-hover: rgba(255,255,255,.08);
+    --control-border: rgba(255,255,255,.07);
+    --control-border-bottom: rgba(255,255,255,.09);
+    --track: rgba(255,255,255,.1);
+    --good: #6ccb5f;
+    --warn: #fce100;
+    --bad: #ff99a4;
+    --charge: #6ccb5f;
+    --flyout-bg: #242424;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: transparent; color: var(--text); font: 14px/20px var(--font); -webkit-font-smoothing: antialiased; user-select: none; }
+  body.flyout-view { background: var(--flyout-bg); overflow: hidden; }
+  ::-webkit-scrollbar { width: 12px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 6px; border: 4px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb:hover { border-width: 3px; }
+  .glyph { font-family: var(--icons); font-style: normal; font-weight: normal; line-height: 1; }
+  button { font: inherit; color: inherit; }
+  input, select { font: inherit; color: inherit; }
+
+  /* ---------- settings page ---------- */
+  .page { max-width: 1000px; margin: 0 auto; padding: 28px 36px 40px; }
+  .hero { display: flex; align-items: center; gap: 16px; margin-bottom: 28px; }
+  .hero img { width: 56px; height: 56px; border-radius: 12px; }
+  .hero h1 { font: 600 28px/36px var(--font-display); margin: 0; letter-spacing: -.2px; }
+  .hero p { margin: 2px 0 0; color: var(--text-2); }
+  .hero .spacer { flex: 1; }
+
+  h2 { font: 600 14px/20px var(--font); margin: 28px 0 8px; }
+  h2:first-of-type { margin-top: 0; }
+  .hint { color: var(--text-2); font-size: 12px; line-height: 16px; }
+
+  .card { background: var(--card); border: 1px solid var(--card-border); border-radius: 6px; margin-bottom: 3px; overflow: hidden; }
+  .row { display: flex; align-items: center; gap: 16px; padding: 14px 16px; min-height: 68px; }
+  .row .icon { width: 20px; text-align: center; font-size: 18px; color: var(--text); flex: none; }
+  .row .label { flex: 1; min-width: 0; }
+  .row .label .t { display: block; }
+  .row .label .d { display: block; color: var(--text-2); font-size: 12px; line-height: 16px; margin-top: 1px; }
+  .card .row + .row, .body .row { border-top: 1px solid var(--divider); }
+  .body .row { padding-left: 56px; min-height: 60px; }
+
+  .device .head { cursor: default; }
+  .device .head:hover { background: var(--card-hover); }
+  .tile { width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; background: var(--control); border: 1px solid var(--control-border); flex: none; position: relative; }
+  .tile .glyph { font-size: 20px; }
+  .tile .bolt { position: absolute; right: -4px; bottom: -4px; width: 18px; height: 18px; border-radius: 9px; background: var(--charge); color: #fff; font-size: 10px; display: grid; place-items: center; }
+  .dark .tile .bolt { color: #000; }
+  .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sub { color: var(--text-2); font-size: 12px; line-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .battery { width: 140px; flex: none; text-align: right; }
+  .pct { font: 600 20px/24px var(--font-display); font-variant-numeric: tabular-nums; }
+  .pct small { font-size: 13px; font-weight: 400; color: var(--text-2); margin-left: 1px; }
+  .bar { height: 4px; border-radius: 2px; background: var(--track); margin-top: 6px; overflow: hidden; }
+  .bar i { display: block; height: 100%; border-radius: 2px; background: var(--good); transition: width .3s ease; }
+  .bar i.warn { background: var(--warn); } .bar i.bad { background: var(--bad); } .bar i.off { background: var(--text-3); }
+  .pct.bad { color: var(--bad); } .pct.warn { color: var(--warn); } .pct.off { color: var(--text-3); }
+  .chev { font-size: 12px; color: var(--text-2); transition: transform .15s ease; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 4px; }
+  .device.open .chev { transform: rotate(180deg); }
+  .device .body { display: none; }
+  .device.open .body { display: block; }
+  .off-text { color: var(--text-3); }
+
+  .empty { padding: 28px 24px; text-align: center; color: var(--text-2); }
+  .empty .glyph { font-size: 32px; display: block; margin-bottom: 10px; color: var(--text-3); }
+
+  /* controls */
+  .toggle { display: inline-flex; align-items: center; gap: 12px; cursor: default; }
+  .toggle .state { color: var(--text); min-width: 22px; text-align: right; }
+  .toggle input { appearance: none; width: 40px; height: 20px; border-radius: 10px; margin: 0; border: 1px solid var(--text-2); background: var(--control); position: relative; transition: background .15s; }
+  .toggle input::after { content: ""; position: absolute; width: 12px; height: 12px; border-radius: 6px; background: var(--text-2); top: 3px; left: 4px; transition: left .15s cubic-bezier(.2,.8,.2,1), width .1s; }
+  .toggle input:hover::after { width: 14px; height: 14px; top: 2px; }
+  .toggle input:checked { background: var(--accent); border-color: var(--accent); }
+  .toggle input:checked::after { left: 23px; background: var(--on-accent); }
+  .toggle input:checked:hover::after { left: 21px; }
+
+  .btn { background: var(--control); border: 1px solid var(--control-border); border-bottom-color: var(--control-border-bottom); border-radius: 4px; padding: 5px 12px; min-height: 32px; cursor: default; display: inline-flex; align-items: center; gap: 8px; }
+  .btn:hover { background: var(--control-hover); }
+  .btn:active { opacity: .8; }
+  .btn.accent { background: var(--accent); color: var(--on-accent); border-color: transparent; }
+  .btn.icon { width: 34px; padding: 0; justify-content: center; }
+  .btn.danger { color: var(--bad); }
+  .btn .glyph { font-size: 14px; }
+  select, input[type=text] { background: var(--control); border: 1px solid var(--control-border); border-bottom-color: var(--control-border-bottom); border-radius: 4px; padding: 5px 10px; min-height: 32px; min-width: 200px; outline: none; }
+  .dark select option { background: #2b2b2b; }
+  input[type=text]:focus { border-bottom: 2px solid var(--accent); padding-bottom: 4px; background: var(--card); }
+  select:hover, input[type=text]:hover { background: var(--control-hover); }
+
+  .seg { display: inline-flex; background: var(--control); border: 1px solid var(--control-border); border-radius: 6px; padding: 2px; gap: 2px; }
+  .seg button { border: 0; background: transparent; border-radius: 4px; padding: 5px 14px; display: inline-flex; gap: 8px; align-items: center; }
+  .seg button:hover { background: var(--control-hover); }
+  .seg button.on { background: var(--accent); color: var(--on-accent); }
+
+  .range { display: inline-flex; align-items: center; gap: 12px; }
+  .range output { min-width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
+  input[type=range] { appearance: none; width: 180px; height: 20px; background: transparent; margin: 0; }
+  input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--accent) var(--p, 50%), var(--text-3) var(--p, 50%)); }
+  input[type=range]::-webkit-slider-thumb { appearance: none; width: 20px; height: 20px; border-radius: 10px; margin-top: -8px; background: var(--flyout-bg); border: 1px solid var(--control-border); box-shadow: inset 0 0 0 5px var(--flyout-bg), inset 0 0 0 10px var(--accent); }
+
+  .note { display: flex; gap: 10px; align-items: flex-start; padding: 12px 16px; border-radius: 6px; background: var(--card); border: 1px solid var(--card-border); color: var(--text-2); font-size: 12px; line-height: 16px; margin-bottom: 3px; }
+  .note .glyph { font-size: 16px; color: var(--accent); margin-top: 1px; }
+
+  footer { margin-top: 32px; display: flex; align-items: center; gap: 12px; color: var(--text-2); font-size: 12px; }
+  footer .spacer { flex: 1; }
+
+  /* ---------- flyout ---------- */
+  .flyout { padding: 0; }
+  .fhead { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px; }
+  .fhead img { width: 22px; height: 22px; border-radius: 5px; }
+  .fhead .t { font-weight: 600; flex: 1; }
+  .flist { padding: 2px 8px 8px; }
+  .fitem { display: flex; align-items: center; gap: 12px; padding: 10px 8px; border-radius: 6px; }
+  .fitem:hover { background: var(--card-hover); }
+  .fitem .tile { width: 36px; height: 36px; }
+  .fitem .tile .glyph { font-size: 18px; }
+  .fitem .info { flex: 1; min-width: 0; }
+  .fitem .battery { width: 92px; }
+  .fitem .pct { font-size: 18px; line-height: 22px; }
+  .ffoot { display: flex; align-items: center; gap: 8px; padding: 10px 16px 12px; border-top: 1px solid var(--divider); background: rgba(127,127,127,.04); }
+  .ffoot .spacer { flex: 1; }
+  .ghost { background: transparent; border: 0; border-radius: 4px; padding: 6px 10px; display: inline-flex; gap: 8px; align-items: center; cursor: default; }
+  .ghost:hover { background: var(--card-hover); }
+  .ghost .glyph { font-size: 14px; }
+  .spin { animation: spin .8s linear; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const VIEW = "{{VIEW}}";
+const LOGO = "{{LOGO}}";
+const send = (msg) => window.chrome.webview.postMessage(msg);
+let state = null;
+let deferred = false;
+const open = new Set();
+document.addEventListener("focusout", () => setTimeout(() => { if (deferred && state && VIEW !== "flyout") renderSettings(); }, 0));
+
+const $ = (html) => { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstElementChild; };
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+function levelClass(d) {
+  if (!d.connected) return "off";
+  if (d.level == null) return "off";
+  if (d.level <= d.lowThreshold) return "bad";
+  if (d.level <= d.lowThreshold + 10) return "warn";
+  return "";
+}
+function pctHtml(d) {
+  if (d.level == null) return `<span class="off-text">—</span>`;
+  return `${d.approx ? "~" : ""}${d.level}<small>%</small>`;
+}
+function subText(d) {
+  const parts = [];
+  if (!d.connected) parts.push("Disconnected");
+  else if (d.charging) parts.push("Charging");
+  else parts.push("Connected");
+  if (d.detail && d.connected) parts.push(d.detail);
+  parts.push(d.sourceLabel);
+  return parts.join(" · ");
+}
+
+function toggle(id, checked, label) {
+  return `<label class="toggle"><span class="state">${checked ? "On" : "Off"}</span><input type="checkbox" data-k="${id}" ${checked ? "checked" : ""} aria-label="${esc(label)}"></label>`;
+}
+
+function deviceBody(d) {
+  const kinds = state.kinds.map(k => `<option value="${k.value}" ${d.kindOverride === k.value ? "selected" : ""}>${esc(k.label)}</option>`).join("");
+  const detected = state.kinds.find(k => k.value === d.detectedKind)?.label ?? "Other device";
+  const lows = [10, 15, 20, 25, 30, 40, 50].map(v => `<option value="${v}" ${d.lowThreshold === v ? "selected" : ""}>${v}%</option>`).join("");
+  return `
+  <div class="body">
+    <div class="row"><div class="label"><span class="t">Name</span><span class="d">Shown on the taskbar, in alerts and here</span></div>
+      <input type="text" data-k="customName" value="${esc(d.customName ?? "")}" placeholder="${esc(d.name)}"></div>
+    <div class="row"><div class="label"><span class="t">Icon</span><span class="d">The symbol shown next to the battery level</span></div>
+      <select data-k="kindOverride"><option value="">Automatic (${esc(detected)})</option>${kinds}</select></div>
+    <div class="row"><div class="label"><span class="t">Show on the taskbar</span></div>${toggle("showOnTaskbar", d.showOnTaskbar, "Show on the taskbar")}</div>
+    <div class="row"><div class="label"><span class="t">Hide while disconnected</span><span class="d">Otherwise it stays, greyed out, with the last known level</span></div>${toggle("hideWhenDisconnected", d.hideWhenDisconnected, "Hide while disconnected")}</div>
+    <div class="row"><div class="label"><span class="t">Low battery alert</span><span class="d">Notify me when the battery drops to</span></div>
+      <select data-k="lowThreshold" style="min-width:90px">${lows}</select>${toggle("notifyLow", d.notifyLow, "Low battery alert")}</div>
+    <div class="row"><div class="label"><span class="t">Fully charged alert</span></div>${toggle("notifyFull", d.notifyFull, "Fully charged alert")}</div>
+    <div class="row"><div class="label"><span class="t">Connected and disconnected alerts</span></div>${toggle("notifyConnection", d.notifyConnection, "Connection alerts")}</div>
+    <div class="row"><div class="label"><span class="t">Forget this device</span><span class="d">It comes back automatically the next time it reports a battery level</span></div>
+      <button class="btn danger" data-act="forget"><i class="glyph">&#xE74D;</i>Forget</button></div>
+  </div>`;
+}
+
+function deviceCard(d) {
+  const el = $(`
+  <div class="card device ${open.has(d.id) ? "open" : ""}" data-id="${esc(d.id)}">
+    <div class="row head">
+      <div class="tile"><i class="glyph">${d.glyph}</i>${d.charging && d.connected ? `<span class="bolt glyph">&#xE945;</span>` : ""}</div>
+      <div class="label"><div class="name">${esc(d.displayName)}</div><div class="sub">${esc(subText(d))}</div></div>
+      <div class="battery"><div class="pct ${levelClass(d)}">${pctHtml(d)}</div><div class="bar"><i class="${levelClass(d)}" style="width:${d.level ?? 0}%"></i></div></div>
+      <span class="chev glyph">&#xE70D;</span>
+    </div>
+    ${deviceBody(d)}
+  </div>`);
+  el.querySelector(".head").addEventListener("click", () => {
+    el.classList.toggle("open");
+    el.classList.contains("open") ? open.add(d.id) : open.delete(d.id);
+  });
+  el.querySelectorAll("[data-k]").forEach(c => {
+    const k = c.dataset.k;
+    const commit = () => {
+      let v = c.type === "checkbox" ? c.checked : c.value;
+      if (k === "lowThreshold") v = parseInt(v, 10);
+      if (k === "kindOverride" && v === "") v = null;
+      if (c.type === "checkbox") c.previousElementSibling.textContent = v ? "On" : "Off";
+      send({ type: "device", id: d.id, patch: { [k]: v } });
+    };
+    c.addEventListener("change", commit);
+    if (c.type === "text") c.addEventListener("keydown", e => { if (e.key === "Enter") c.blur(); });
+  });
+  el.querySelector("[data-act=forget]").addEventListener("click", () => send({ type: "forget", id: d.id }));
+  return el;
+}
+
+function generalRow(icon, title, desc, control) {
+  return `<div class="row"><i class="icon glyph">${icon}</i><div class="label"><span class="t">${title}</span>${desc ? `<span class="d">${desc}</span>` : ""}</div>${control}</div>`;
+}
+
+function renderSettings() {
+  const s = state.settings;
+  const app = document.getElementById("app");
+  const ae = document.activeElement;
+  if (ae && (ae.tagName === "SELECT" || (ae.tagName === "INPUT" && ae.type === "text"))) {
+    // Don't disturb typing or an open dropdown; re-render once focus leaves.
+    deferred = true;
+    return;
+  }
+  deferred = false;
+
+  const scroll = document.scrollingElement.scrollTop;
+  const polls = [[15, "15 seconds"], [30, "30 seconds"], [60, "1 minute"], [120, "2 minutes"], [300, "5 minutes"]]
+    .map(([v, l]) => `<option value="${v}" ${s.pollSeconds === v ? "selected" : ""}>${l}</option>`).join("");
+  const src = (k, icon, title, desc) => generalRow(icon, title, desc, toggle(k, s[k], title));
+
+  app.innerHTML = `
+  <div class="page">
+    <div class="hero">
+      <img src="${LOGO}" alt="">
+      <div><h1>Wireless device battery tracker</h1><p>Battery levels of your wireless devices, right on the taskbar.</p></div>
+      <div class="spacer"></div>
+      <button class="btn" id="refresh"><i class="glyph">&#xE72C;</i>Refresh</button>
+    </div>
+
+    <h2>Devices</h2>
+    <div id="devices"></div>
+    ${state.others.length ? `
+      <h2>Connected without battery information</h2>
+      <div class="note"><i class="glyph">&#xE946;</i><span>These devices are connected, but they don't report a battery level to Windows. If one should, make sure its source is turned on under <b>Device sources</b>.</span></div>
+      ${state.others.map(o => `<div class="card"><div class="row"><div class="tile"><i class="glyph">${o.glyph}</i></div><div class="label"><div class="name">${esc(o.name)}</div><div class="sub">${esc(o.sourceLabel)}</div></div></div></div>`).join("")}` : ""}
+
+    <h2>Taskbar</h2>
+    <div class="card">
+      ${generalRow("&#xE75B;", "Display style", state.embedded || s.taskbarMode !== "Inline"
+          ? "In the taskbar: one item per device next to the notification area. Tray icons: one square icon per device."
+          : "Couldn't place items in the taskbar right now, so tray icons are shown instead.",
+        `<div class="seg" id="mode">
+          <button data-v="Inline" class="${s.taskbarMode === "Inline" ? "on" : ""}"><i class="glyph">&#xE8A9;</i>In the taskbar</button>
+          <button data-v="TrayIcons" class="${s.taskbarMode === "TrayIcons" ? "on" : ""}"><i class="glyph">&#xE8A1;</i>Tray icons</button>
+        </div>`)}
+      ${generalRow("&#xE8EF;", "Show % sign", "", toggle("showPercentSign", s.showPercentSign, "Show % sign"))}
+      ${s.taskbarMode === "TrayIcons" ? generalRow("&#xE8A0;", "Keep tray icons visible", "Show them on the taskbar instead of in the ^ menu", toggle("keepIconsVisible", s.keepIconsVisible, "Keep tray icons visible")) : ""}
+    </div>
+
+    <h2>Notifications</h2>
+    <div class="card">
+      ${generalRow("&#xEBA0;", "Critical battery alert", "A second, urgent alert when any device drops to this level",
+        `<span class="range"><input type="range" id="critical" min="1" max="20" value="${s.criticalLevel}"><output>${s.criticalLevel}%</output></span>`)}
+      ${generalRow("&#xEA8F;", "Test notification", "Check that alerts appear on your screen", `<button class="btn" id="test">Send test</button>`)}
+    </div>
+
+    <h2>General</h2>
+    <div class="card">
+      ${generalRow("&#xE7E8;", "Start with Windows", "Open automatically when you sign in", toggle("startWithWindows", s.startWithWindows, "Start with Windows"))}
+      ${generalRow("&#xE916;", "Check batteries every", "Devices that connect or disconnect are picked up immediately", `<select id="poll">${polls}</select>`)}
+    </div>
+
+    <h2>Device sources</h2>
+    <div class="card">
+      ${src("enableBluetooth", "&#xE702;", "Bluetooth", "Battery levels Windows reads from Bluetooth headphones, mice and keyboards")}
+      ${src("enableApple", "&#xE7F6;", "AirPods and Beats", "Left, right and case levels from Apple's Bluetooth broadcasts")}
+      ${src("enablePlayStation", "&#xE7FC;", "PlayStation controllers", "DualSense, DualSense Edge and DUALSHOCK 4 over USB or Bluetooth")}
+      ${src("enableXbox", "&#xE7FC;", "Xbox controllers", "Wireless adapter or Bluetooth")}
+      ${src("enableLogitech", "&#xE962;", "Logitech receivers", "Bolt, Unifying and Lightspeed USB receivers")}
+      ${src("enableBleGatt", "&#xE701;", "Bluetooth LE battery service", "Devices that publish the standard Bluetooth battery service")}
+    </div>
+
+    <footer><span>Version ${esc(state.version)}</span><span class="spacer"></span><button class="btn" id="quit"><i class="glyph">&#xE7E8;</i>Quit app</button></footer>
+  </div>`;
+
+  const list = document.getElementById("devices");
+  if (state.devices.length === 0) {
+    list.appendChild($(`<div class="card empty"><i class="glyph">&#xE702;</i>No devices yet. Connect a wireless device and it appears here as soon as it reports a battery level.</div>`));
+  }
+  state.devices.forEach(d => list.appendChild(deviceCard(d)));
+
+  document.getElementById("refresh").onclick = (e) => { e.currentTarget.querySelector(".glyph").classList.add("spin"); send({ type: "refresh" }); };
+  document.getElementById("test").onclick = () => send({ type: "test" });
+  document.getElementById("quit").onclick = () => send({ type: "exit" });
+  document.getElementById("poll").onchange = (e) => send({ type: "general", patch: { pollSeconds: parseInt(e.target.value, 10) } });
+  document.querySelectorAll("#mode button").forEach(b => b.onclick = () => send({ type: "general", patch: { taskbarMode: b.dataset.v } }));
+  const crit = document.getElementById("critical");
+  const paint = () => { crit.style.setProperty("--p", ((crit.value - crit.min) / (crit.max - crit.min) * 100) + "%"); crit.nextElementSibling.textContent = crit.value + "%"; };
+  paint();
+  crit.oninput = paint;
+  crit.onchange = () => send({ type: "general", patch: { criticalLevel: parseInt(crit.value, 10) } });
+  document.querySelectorAll(".page > .card [data-k]").forEach(c => c.addEventListener("change", () => {
+    c.previousElementSibling.textContent = c.checked ? "On" : "Off";
+    send({ type: "general", patch: { [c.dataset.k]: c.checked } });
+  }));
+  document.scrollingElement.scrollTop = scroll;
+}
+
+function renderFlyout() {
+  const app = document.getElementById("app");
+  const devices = state.devices.filter(d => d.level != null || d.connected);
+  app.innerHTML = `
+  <div class="flyout">
+    <div class="fhead"><img src="${LOGO}" alt=""><span class="t">Wireless devices</span>
+      <button class="ghost" id="refresh" title="Refresh"><i class="glyph">&#xE72C;</i></button></div>
+    <div class="flist">
+      ${devices.length ? devices.map(d => `
+        <div class="fitem" data-id="${esc(d.id)}">
+          <div class="tile"><i class="glyph">${d.glyph}</i>${d.charging && d.connected ? `<span class="bolt glyph">&#xE945;</span>` : ""}</div>
+          <div class="info"><div class="name">${esc(d.displayName)}</div><div class="sub">${esc(d.connected ? (d.detail || (d.charging ? "Charging" : "Connected")) : "Disconnected")}</div></div>
+          <div class="battery"><div class="pct ${levelClass(d)}">${pctHtml(d)}</div><div class="bar"><i class="${levelClass(d)}" style="width:${d.level ?? 0}%"></i></div></div>
+        </div>`).join("") : `<div class="empty"><i class="glyph">&#xE702;</i>No devices with battery information yet.</div>`}
+    </div>
+    <div class="ffoot"><button class="ghost" id="settings"><i class="glyph">&#xE713;</i>Settings</button><span class="spacer"></span><span class="hint">${devices.filter(d => d.connected).length} connected</span></div>
+  </div>`;
+  document.getElementById("refresh").onclick = (e) => { e.currentTarget.querySelector(".glyph").classList.add("spin"); send({ type: "refresh" }); };
+  document.getElementById("settings").onclick = () => send({ type: "settings" });
+  document.querySelectorAll(".fitem").forEach(f => f.onclick = () => send({ type: "settings", id: f.dataset.id }));
+  requestAnimationFrame(() => send({ type: "size", height: document.querySelector(".flyout").getBoundingClientRect().height }));
+}
+
+window.chrome.webview.addEventListener("message", (e) => {
+  const msg = e.data;
+  if (msg.type === "state") {
+    state = msg;
+    document.documentElement.classList.toggle("dark", !msg.light);
+    document.documentElement.style.setProperty("--accent", msg.accent);
+    document.documentElement.style.setProperty("--on-accent", msg.onAccent);
+    if (msg.openId) open.add(msg.openId);
+    VIEW === "flyout" ? renderFlyout() : renderSettings();
+    if (msg.openId && VIEW !== "flyout") document.querySelector(`[data-id="${CSS.escape(msg.openId)}"]`)?.scrollIntoView({ block: "center" });
+  }
+});
+document.body.classList.add(VIEW + "-view");
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && VIEW === "flyout") send({ type: "close" }); });
+send({ type: "ready" });
+</script>
+</body>
+</html>
